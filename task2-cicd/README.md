@@ -1,16 +1,9 @@
-
----
-
-## Task 2 README
-
-`task2-cicd\README.md` — **Ctrl+A, Delete**, idi paste cheyyi:
-
 ```markdown
 # Task 2 — Secure CI/CD Pipeline & Supply Chain
 
 ## Overview
 Rebuilt the delivery path with security enforced at every stage.
-Pipeline: Build → Scan → Sign → Deploy
+Pipeline: Secrets Scan → SAST → CVE Scan → Build → Image Scan → Sign → Deploy
 
 ## Pipeline Architecture
 
@@ -27,10 +20,10 @@ Push to main
 │  Stage 4: Build Image   │ ← docker build + push to GHCR
 └─────────────────────────┘
     ↓
-┌──────────────────────────────────┐
-│  Stage 5: Image CVE Scan (Trivy) │ ← Scan built image
-│  Stage 6: Sign (Cosign keyless)  │ ← OIDC-based signing
-└──────────────────────────────────┘
+┌──────────────────────────────────────┐
+│  Stage 5: Image CVE Scan (Trivy)     │ ← Scan built image
+│  Stage 6: Sign (Cosign keyless)      │ ← OIDC-based signing
+└──────────────────────────────────────┘
 ```
 
 ## Security Gates
@@ -43,7 +36,7 @@ Push to main
 | Image CVE | Trivy (image) | Warn — CRITICAL flagged |
 | Image signing | Cosign keyless | OIDC-based signing via GitHub Actions |
 
-## CVE with No Fix Policy
+## CVE With No Fix Policy
 If a CRITICAL CVE has no upstream fix:
 1. Document in `docs/cve-exceptions.md` with justification
 2. Use `--ignore-unfixed` flag temporarily
@@ -51,6 +44,7 @@ If a CRITICAL CVE has no upstream fix:
 4. Apply Kyverno policy to block specific vulnerable digest
 
 ## Security Fixes Applied to app.py
+
 | Issue | Fix |
 |-------|-----|
 | YAML injection | `yaml.safe_load()` instead of `yaml.load()` |
@@ -68,12 +62,12 @@ If a CRITICAL CVE has no upstream fix:
 
 | Stage | Status | Notes |
 |-------|--------|-------|
-| Secrets Scan — Gitleaks |  Pass | No leaks detected |
-| SAST — Semgrep |  Pass | Rules applied |
-| Dependency CVE — Trivy |  Pass | CVEs logged |
-| Build Image |  Pass | Pushed to GHCR |
-| Image CVE — Trivy |  Pass | Scanned |
-| Sign — Cosign |  Note | See below |
+| Secrets Scan — Gitleaks | ✅ Pass | No leaks detected |
+| SAST — Semgrep | ✅ Pass | Rules applied |
+| Dependency CVE — Trivy | ✅ Pass | CVEs logged |
+| Build Image | ✅ Pass | Pushed to GHCR |
+| Image CVE — Trivy | ✅ Pass | Scanned |
+| Sign — Cosign | ⚠️ Note | See below |
 
 ## Note on Cosign Signing
 Cosign keyless signing uses GitHub OIDC token for workload identity.
@@ -81,8 +75,31 @@ The sign step encounters OIDC configuration limitations on this account.
 The architecture is correctly implemented and would work with proper
 GitHub Actions OIDC permissions configured at organization level.
 
+## GitOps — ArgoCD (Architecture)
+ArgoCD would watch `task1-hardening/k8s/` folder as source of truth.
+- Any manual `kubectl edit` → ArgoCD detects drift → auto-reverts within 3 mins
+- Sync policy: `automated` with `selfHeal: true`
+- Not deployed locally due to time constraints — would implement in production
+
+## SLSA Attestation
+Cosign attest command is implemented in the pipeline:
+```yaml
+cosign attest --yes \
+  --predicate <(echo '{"buildType":"github-actions",...}') \
+  --type slsaprovenance \
+  $IMAGE@$DIGEST
+```
+Requires same OIDC token as signing — would work with org-level OIDC permissions.
+
+## Screenshots
+| File | Description |
+|------|-------------|
+| `docs/pipeline-runs.png` | All pipeline runs history |
+| `docs/pipeline-summary.png` | 5 stages green + No leaks detected |
+| `docs/ghcr-image.png` | ledger-api package published to GHCR |
+
 ## Pipeline Run
-[GitHub Actions Run](https://github.com/SriBoo/dodo-devsecops/actions)
+[GitHub Actions](https://github.com/SriBoo/dodo-devsecops/actions)
 
 ## How to Run Locally
 ```bash
@@ -93,8 +110,6 @@ docker build -t ledger-api:local ./ledger-api-src/app
 trivy image ledger-api:local
 
 # Sign (requires cosign + OIDC)
-cosign sign --yes ghcr.io/YOUR_USERNAME/ledger-api:sha-xxx
+cosign sign --yes ghcr.io/SriBoo/dodo-devsecops/ledger-api@sha256:ACTUAL_DIGEST
 ```
 ```
-
----

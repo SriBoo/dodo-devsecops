@@ -1,7 +1,3 @@
-## Task 3 README
-
-`task3-mesh\README.md` — **Ctrl+A, Delete**, idi paste cheyyi:
-
 ```markdown
 # Task 3 — Service Mesh & Zero-Trust (Istio)
 

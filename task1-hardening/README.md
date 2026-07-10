@@ -1,7 +1,3 @@
-## Task 1 README
-
-`task1-hardening\README.md` — **Ctrl+A, Delete**, idi paste cheyyi:
-
 ```markdown
 # Task 1 — Workload Hardening
 
